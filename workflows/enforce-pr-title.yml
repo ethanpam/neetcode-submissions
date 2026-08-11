@@ -1,0 +1,47 @@
+name: Enforce PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title format
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          # conventional commit types, with optional (scope) and ! for breaking
+          types='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
+          pattern="^(${types})(\(.+\))?!?: .+"
+
+          if [[ "$TITLE" =~ $pattern ]] || [[ "$TITLE" =~ ^BREAKING\ CHANGE:\ .+ ]]; then
+            echo "Valid title: $TITLE"
+            exit 0
+          fi
+
+          echo "::error::PR title must be '<type>: description'."
+          {
+            echo "PR title does not follow the required format."
+            echo ""
+            echo "Use:  <type>: description   (e.g. 'chore: update deps')"
+            echo ""
+            echo "Allowed types: ${types//|/, }"
+            echo "Optional: a (scope) and/or a trailing ! for breaking changes,"
+            echo "or the literal 'BREAKING CHANGE: description'."
+            echo ""
+            echo "Examples:"
+            echo "  chore: tidy up styles"
+            echo "  feat(auth): add login page"
+            echo "  fix!: drop the old endpoint"
+            echo "  BREAKING CHANGE: rework the API"
+            echo ""
+            echo "Your title was: $TITLE"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
